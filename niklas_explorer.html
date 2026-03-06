@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Niklas Morphospace Explorer</title>
+    <!-- Tailwind CSS for UI styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js for 3D rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls for camera manipulation -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #1e293b; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: flex; }
+        .interactive-panel { pointer-events: auto; }
+        
+        /* Custom range slider styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: #10b981;
+            cursor: pointer;
+            margin-top: -5px;
+        }
+        input[type=range]:disabled::-webkit-slider-thumb {
+            background: #64748b;
+            cursor: not-allowed;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #475569;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 3D Canvas -->
+    <div id="canvas-container"></div>
+
+    <!-- UI Overlay -->
+    <div id="ui-layer" class="p-6 justify-between">
+        
+        <!-- Left Panel: Controls -->
+        <div class="interactive-panel w-[24rem] bg-slate-800/90 backdrop-blur-md border border-slate-700 rounded-xl p-5 shadow-2xl flex flex-col gap-5 text-slate-200 h-fit max-h-[95vh] overflow-y-auto">
+            <div>
+                <h1 class="text-xl font-bold text-emerald-400 mb-1">Morphospace Explorer</h1>
+                <p class="text-xs text-slate-400">Full 6-Parameter Model (Niklas 1994)</p>
+            </div>
+
+            <!-- Make Simple Checkbox -->
+            <div class="flex items-center gap-3 bg-slate-700/50 p-3 rounded-lg border border-slate-600 transition-colors hover:bg-slate-700/80">
+                <input type="checkbox" id="check-simple" class="w-4 h-4 accent-emerald-500 cursor-pointer">
+                <label for="check-simple" class="text-sm font-semibold text-emerald-300 cursor-pointer select-none w-full">Make Simple (Isotropic Branching)</label>
+            </div>
+
+            <!-- 2-Column Grid for Axis 1 and Axis 2 -->
+            <div class="grid grid-cols-2 gap-5 border-b border-slate-600 pb-5">
+                
+                <!-- Axis 1 -->
+                <div class="space-y-4">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-600 pb-1">Axis 1 (Main)</h3>
+                    
+                    <!-- P1 -->
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <label class="text-[11px] font-semibold" title="Probability of Axis 1 branching">Prob. (P&#8321;)</label>
+                            <span id="val-p1" class="text-[11px] font-mono text-emerald-300">1.00</span>
+                        </div>
+                        <input type="range" id="slider-p1" min="0" max="1" step="0.01" value="1">
+                    </div>
+
+                    <!-- Phi 1 -->
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <label class="text-[11px] font-semibold" title="Bifurcation Angle for Axis 1">Bifurc. (&phi;&#8321;)</label>
+                            <span id="val-phi1" class="text-[11px] font-mono text-emerald-300">45&deg;</span>
+                        </div>
+                        <input type="range" id="slider-phi1" min="0" max="180" step="1" value="45">
+                    </div>
+
+                    <!-- Gamma 1 -->
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <label class="text-[11px] font-semibold" title="Rotation Angle for Axis 1">Rot. (&gamma;&#8321;)</label>
+                            <span id="val-gamma1" class="text-[11px] font-mono text-emerald-300">90&deg;</span>
+                        </div>
+                        <input type="range" id="slider-gamma1" min="0" max="180" step="1" value="90">
+                    </div>
+                </div>
+
+                <!-- Axis 2 -->
+                <div class="space-y-4 transition-opacity duration-300" id="axis-2-container">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-600 pb-1">Axis 2 (Lateral)</h3>
+                    
+                    <!-- P2 -->
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <label class="text-[11px] font-semibold" title="Probability of Axis 2 branching">Prob. (P&#8322;)</label>
+                            <span id="val-p2" class="text-[11px] font-mono text-emerald-300">1.00</span>
+                        </div>
+                        <input type="range" id="slider-p2" min="0" max="1" step="0.01" value="1">
+                    </div>
+
+                    <!-- Phi 2 -->
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <label class="text-[11px] font-semibold" title="Bifurcation Angle for Axis 2">Bifurc. (&phi;&#8322;)</label>
+                            <span id="val-phi2" class="text-[11px] font-mono text-emerald-300">45&deg;</span>
+                        </div>
+                        <input type="range" id="slider-phi2" min="0" max="180" step="1" value="45">
+                    </div>
+
+                    <!-- Gamma 2 -->
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <label class="text-[11px] font-semibold" title="Rotation Angle for Axis 2">Rot. (&gamma;&#8322;)</label>
+                            <span id="val-gamma2" class="text-[11px] font-mono text-emerald-300">90&deg;</span>
+                        </div>
+                        <input type="range" id="slider-gamma2" min="0" max="180" step="1" value="90">
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="space-y-4">
+                <!-- N: Branching Orders -->
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-[11px] font-semibold">Max Branching Orders (N)</label>
+                        <span id="val-n" class="text-[11px] font-mono text-emerald-300">6</span>
+                    </div>
+                    <input type="range" id="slider-n" min="1" max="8" step="1" value="6">
+                </div>
+
+                <!-- Seed: Random Pattern -->
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-[11px] font-semibold">Random Seed</label>
+                        <span id="val-seed" class="text-[11px] font-mono text-emerald-300">42</span>
+                    </div>
+                    <input type="range" id="slider-seed" min="1" max="100" step="1" value="42">
+                </div>
+            </div>
+            
+            <div class="mt-auto pt-2 text-[10px] text-slate-400">
+                Left Click: Rotate | Scroll: Zoom
+            </div>
+        </div>
+
+        <!-- Right Panel: Fitness Scores -->
+        <div class="interactive-panel w-72 bg-slate-800/90 backdrop-blur-md border border-slate-700 rounded-xl p-5 shadow-2xl flex flex-col gap-5 text-slate-200 h-fit">
+            <h2 class="text-lg font-bold text-white border-b border-slate-600 pb-2">Fitness Landscape</h2>
+            
+            <!-- Light Interception -->
+            <div>
+                <div class="flex justify-between text-sm mb-1">
+                    <span class="font-semibold text-yellow-400">Light Interception (I)</span>
+                    <span id="score-light" class="font-mono">0</span>
+                </div>
+                <div class="w-full bg-slate-700 rounded-full h-2">
+                    <div id="bar-light" class="bg-yellow-400 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Reproductive Success -->
+            <div>
+                <div class="flex justify-between text-sm mb-1">
+                    <span class="font-semibold text-pink-400">Reproduction (R)</span>
+                    <span id="score-repro" class="font-mono">0</span>
+                </div>
+                <div class="w-full bg-slate-700 rounded-full h-2">
+                    <div id="bar-repro" class="bg-pink-400 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Mechanical Stability -->
+            <div>
+                <div class="flex justify-between text-sm mb-1">
+                    <span class="font-semibold text-blue-400" title="Calculated from Center of Mass offset and local bending">Mech. Stability (M)</span>
+                    <span id="score-mech" class="font-mono">0</span>
+                </div>
+                <div class="w-full bg-slate-700 rounded-full h-2">
+                    <div id="bar-mech" class="bg-blue-400 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- SEEDED RANDOM NUMBER GENERATOR ---
+        let currentSeed = 42;
+        function seedRandom(seed) { currentSeed = seed; }
+        function random() {
+            let x = Math.sin(currentSeed++) * 10000;
+            return x - Math.floor(x);
+        }
+
+        // --- GLOBAL VARIABLES ---
+        let scene, camera, renderer, controls;
+        let treeGroup = new THREE.Group();
+        
+        // Materials
+        const branchMat = new THREE.MeshStandardMaterial({ color: 0x4a5d23, roughness: 0.8, metalness: 0.1 });
+        const sporangiaMat = new THREE.MeshStandardMaterial({ color: 0xcba03a, roughness: 0.7, metalness: 0.1 });
+
+        // Data arrays for fitness calculation
+        let branchesData = []; 
+        let tipsData = [];
+
+        // Attenuation constants
+        const LENGTH_ATTENUATION = 0.75;
+        const RADIUS_ATTENUATION = 0.75;
+        const BASE_LENGTH = 10;
+        const BASE_RADIUS = 0.8;
+
+        init();
+        animate();
+
+        function init() {
+            // Scene setup
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x1e293b, 0.005);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
+            camera.position.set(0, 30, 80);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.target.set(0, 15, 0);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 + 0.1;
+
+            // Lighting
+            scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(20, 50, 20);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            dirLight.shadow.camera.near = 0.5;
+            dirLight.shadow.camera.far = 150;
+            const d = 40;
+            dirLight.shadow.camera.left = -d; dirLight.shadow.camera.right = d;
+            dirLight.shadow.camera.top = d; dirLight.shadow.camera.bottom = -d;
+            scene.add(dirLight);
+
+            scene.add(new THREE.DirectionalLight(0x90b0d0, 0.3).translateY(20).translateX(-20).translateZ(-20));
+
+            // Ground & Grid
+            const groundGeo = new THREE.PlaneGeometry(200, 200);
+            const groundMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 1, metalness: 0, depthWrite: false });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+            
+            const grid = new THREE.GridHelper(100, 20, 0x334155, 0x334155);
+            grid.position.y = 0.01;
+            scene.add(grid);
+
+            scene.add(treeGroup);
+
+            // Listeners
+            const checkSimple = document.getElementById('check-simple');
+            const axis2Container = document.getElementById('axis-2-container');
+            const p2Slider = document.getElementById('slider-p2');
+            const phi2Slider = document.getElementById('slider-phi2');
+
+            checkSimple.addEventListener('change', () => {
+                if (checkSimple.checked) {
+                    // Sync values immediately
+                    p2Slider.value = document.getElementById('slider-p1').value;
+                    phi2Slider.value = document.getElementById('slider-phi1').value;
+                    
+                    // Disable Axis 2 P and Phi sliders and dim the panel slightly
+                    p2Slider.disabled = true;
+                    phi2Slider.disabled = true;
+                    axis2Container.classList.add('opacity-60');
+                } else {
+                    // Re-enable independent control
+                    p2Slider.disabled = false;
+                    phi2Slider.disabled = false;
+                    axis2Container.classList.remove('opacity-60');
+                }
+                updateTree();
+            });
+
+            document.querySelectorAll('input[type=range]').forEach(input => {
+                input.addEventListener('input', (e) => {
+                    if (checkSimple.checked) {
+                        // Keep Axis 2 synced to Axis 1 in real-time
+                        if (e.target.id === 'slider-p1') p2Slider.value = e.target.value;
+                        if (e.target.id === 'slider-phi1') phi2Slider.value = e.target.value;
+                    }
+                    updateTree();
+                });
+            });
+
+            window.addEventListener('resize', onWindowResize, false);
+
+            updateTree();
+        }
+
+        function createCylinder(start, end, radius, isTip) {
+            const direction = new THREE.Vector3().subVectors(end, start);
+            const length = direction.length();
+            
+            const geometry = new THREE.CylinderGeometry(radius * RADIUS_ATTENUATION, radius, length, 8);
+            geometry.translate(0, length / 2, 0); 
+            geometry.rotateX(Math.PI / 2); 
+            
+            const mesh = new THREE.Mesh(geometry, branchMat);
+            mesh.position.copy(start);
+            mesh.lookAt(end);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            treeGroup.add(mesh);
+
+            if (isTip) {
+                const sphereGeo = new THREE.SphereGeometry(radius * 2, 8, 8);
+                const sphere = new THREE.Mesh(sphereGeo, sporangiaMat);
+                sphere.position.copy(end);
+                treeGroup.add(sphere);
+            }
+        }
+
+        function grow(startPos, direction, normal, length, radius, depth, maxDepth, p1, p2, gamma1Rad, gamma2Rad, phi1Rad, phi2Rad, isType2) {
+            const endPos = new THREE.Vector3().copy(startPos).add(direction.clone().multiplyScalar(length));
+            
+            const currentP = isType2 ? p2 : p1;
+            
+            const isTerminal = (depth === maxDepth) || (depth > 1 && random() > currentP);
+
+            createCylinder(startPos, endPos, radius, isTerminal);
+
+            const volume = Math.PI * radius * radius * length;
+            branchesData.push({ start: startPos, end: endPos, radius: radius, length: length, volume: volume });
+
+            if (isTerminal) {
+                tipsData.push({ end: endPos });
+                return;
+            }
+
+            const branchPlaneNormal1 = normal.clone().applyAxisAngle(direction, gamma1Rad).normalize();
+            const branchPlaneNormal2 = normal.clone().applyAxisAngle(direction, gamma2Rad).normalize();
+
+            const dir1 = direction.clone().applyAxisAngle(branchPlaneNormal1, phi1Rad).normalize();
+            const dir2 = direction.clone().applyAxisAngle(branchPlaneNormal2, -phi2Rad).normalize();
+
+            const newLength = length * LENGTH_ATTENUATION;
+            const newRadius = radius * RADIUS_ATTENUATION;
+
+            grow(endPos, dir1, branchPlaneNormal1, newLength, newRadius, depth + 1, maxDepth, p1, p2, gamma1Rad, gamma2Rad, phi1Rad, phi2Rad, false);
+            grow(endPos, dir2, branchPlaneNormal2, newLength, newRadius, depth + 1, maxDepth, p1, p2, gamma1Rad, gamma2Rad, phi1Rad, phi2Rad, true);
+        }
+
+        function updateTree() {
+            while(treeGroup.children.length > 0){ 
+                const child = treeGroup.children[0];
+                treeGroup.remove(child); 
+                child.geometry.dispose();
+            }
+            branchesData = [];
+            tipsData = [];
+
+            // Get UI values
+            const p1 = parseFloat(document.getElementById('slider-p1').value);
+            const p2 = parseFloat(document.getElementById('slider-p2').value);
+            
+            const phi1Deg = parseFloat(document.getElementById('slider-phi1').value);
+            const phi2Deg = parseFloat(document.getElementById('slider-phi2').value);
+            
+            const gamma1Deg = parseFloat(document.getElementById('slider-gamma1').value);
+            const gamma2Deg = parseFloat(document.getElementById('slider-gamma2').value);
+            
+            const maxN = parseInt(document.getElementById('slider-n').value);
+            const seedVal = parseInt(document.getElementById('slider-seed').value);
+
+            // Update UI Labels
+            document.getElementById('val-p1').innerText = p1.toFixed(2);
+            document.getElementById('val-p2').innerText = p2.toFixed(2);
+            document.getElementById('val-phi1').innerHTML = phi1Deg + '&deg;';
+            document.getElementById('val-phi2').innerHTML = phi2Deg + '&deg;';
+            document.getElementById('val-gamma1').innerHTML = gamma1Deg + '&deg;';
+            document.getElementById('val-gamma2').innerHTML = gamma2Deg + '&deg;';
+            document.getElementById('val-n').innerText = maxN;
+            document.getElementById('val-seed').innerText = seedVal;
+
+            // Convert to radians
+            const phi1Rad = THREE.MathUtils.degToRad(phi1Deg);
+            const phi2Rad = THREE.MathUtils.degToRad(phi2Deg);
+            const gamma1Rad = THREE.MathUtils.degToRad(gamma1Deg);
+            const gamma2Rad = THREE.MathUtils.degToRad(gamma2Deg);
+
+            seedRandom(seedVal);
+
+            const startPos = new THREE.Vector3(0, 0, 0);
+            const startDir = new THREE.Vector3(0, 1, 0); 
+            const startNormal = new THREE.Vector3(0, 0, 1); 
+
+            grow(startPos, startDir, startNormal, BASE_LENGTH, BASE_RADIUS, 1, maxN, p1, p2, gamma1Rad, gamma2Rad, phi1Rad, phi2Rad, false);
+
+            calculateFitness(maxN);
+        }
+
+        function calculateFitness(maxN) {
+            // --- 1. REPRODUCTION ---
+            let rScoreRaw = 0;
+            tipsData.forEach(tip => { rScoreRaw += tip.end.y; });
+
+            let maxTheoreticalHeight = 0;
+            let curL = BASE_LENGTH;
+            for(let i=0; i<maxN; i++) {
+                maxTheoreticalHeight += curL;
+                curL *= LENGTH_ATTENUATION;
+            }
+            const maxTipsCount = Math.pow(2, maxN - 1);
+            const maxRScoreRaw = maxTheoreticalHeight * maxTipsCount;
+            let rNorm = Math.min(1.0, rScoreRaw / (maxRScoreRaw || 1));
+
+
+            // --- 2. MECHANICAL STABILITY (CORRECTED) ---
+            let totalVolume = 0;
+            let sumX = 0, sumZ = 0;
+            let localBendingMoment = 0;
+
+            branchesData.forEach(b => {
+                const midX = (b.start.x + b.end.x) / 2;
+                const midZ = (b.start.z + b.end.z) / 2;
+                
+                // Accumulate mass for Center of Mass calculation
+                sumX += midX * b.volume;
+                sumZ += midZ * b.volume;
+                totalVolume += b.volume;
+                
+                // Calculate local bending (how far each branch is from the center)
+                const horizontalDist = Math.sqrt(midX*midX + midZ*midZ);
+                localBendingMoment += b.volume * horizontalDist;
+            });
+
+            // Calculate the 3D Center of Mass (CoM)
+            const comX = sumX / (totalVolume || 1);
+            const comZ = sumZ / (totalVolume || 1);
+            
+            // The distance of the Center of Mass from the base (0,0) represents the "Lopsidedness" Overturning Moment
+            const comDist = Math.sqrt(comX*comX + comZ*comZ);
+            
+            // Maximum possible theoretical horizontal spread
+            const maxTheoreticalSpread = maxTheoreticalHeight; 
+            const maxLocalBending = totalVolume * (maxTheoreticalSpread * 0.5);
+            
+            // Penalty 1: Global Overturning Torque (The plant is lopsided and wants to fall over)
+            const globalPenalty = comDist / (maxTheoreticalSpread * 0.5);
+            
+            // Penalty 2: Local Bending Torque (Long horizontal branches sag under their own weight)
+            const localPenalty = localBendingMoment / (maxLocalBending || 1);
+
+            // Combine the penalties. Lopsidedness is much more detrimental than symmetrical branching.
+            // A perfectly straight vertical line gets 1.0. 
+            // A symmetrical wide plant gets ~0.8. 
+            // A fully lopsided plant drops to ~0.0.
+            let mNorm = 1.0 - (globalPenalty * 1.5) - (localPenalty * 0.5);
+            
+            mNorm = Math.max(0.0, Math.min(1.0, mNorm));
+            if (totalVolume === 0) mNorm = 1.0;
+
+
+            // --- 3. LIGHT INTERCEPTION ---
+            function distToSegmentSquared(px, pz, vx, vz, wx, wz) {
+                let l2 = (wx - vx)*(wx - vx) + (wz - vz)*(wz - vz);
+                if (l2 === 0) return (px - vx)*(px - vx) + (pz - vz)*(pz - vz);
+                let t = ((px - vx) * (wx - vx) + (pz - vz) * (wz - vz)) / l2;
+                t = Math.max(0, Math.min(1, t));
+                let projX = vx + t * (wx - vx);
+                let projZ = vz + t * (wz - vz);
+                return (px - projX)*(px - projX) + (pz - projZ)*(pz - projZ);
+            }
+
+            const res = 0.2; 
+            let minX = 0, maxX = 0, minZ = 0, maxZ = 0;
+            
+            branchesData.forEach(b => {
+                minX = Math.min(minX, b.start.x - b.radius, b.end.x - b.radius);
+                maxX = Math.max(maxX, b.start.x + b.radius, b.end.x + b.radius);
+                minZ = Math.min(minZ, b.start.z - b.radius, b.end.z - b.radius);
+                maxZ = Math.max(maxZ, b.start.z + b.radius, b.end.z + b.radius);
+            });
+
+            minX -= res; maxX += res;
+            minZ -= res; maxZ += res;
+
+            const gridWidth = Math.ceil((maxX - minX) / res) + 1;
+            const gridHeight = Math.ceil((maxZ - minZ) / res) + 1;
+            let shadowGrid = new Uint8Array(gridWidth * gridHeight);
+
+            let hitCount = 0;
+            
+            branchesData.forEach(b => {
+                let bMinX = Math.min(b.start.x, b.end.x) - b.radius;
+                let bMaxX = Math.max(b.start.x, b.end.x) + b.radius;
+                let bMinZ = Math.min(b.start.z, b.end.z) - b.radius;
+                let bMaxZ = Math.max(b.start.z, b.end.z) + b.radius;
+
+                let startCol = Math.max(0, Math.floor((bMinX - minX) / res));
+                let endCol = Math.min(gridWidth - 1, Math.ceil((bMaxX - minX) / res));
+                let startRow = Math.max(0, Math.floor((bMinZ - minZ) / res));
+                let endRow = Math.min(gridHeight - 1, Math.ceil((bMaxZ - minZ) / res));
+
+                let r2 = b.radius * b.radius;
+
+                for(let c = startCol; c <= endCol; c++) {
+                    for(let r = startRow; r <= endRow; r++) {
+                        let idx = r * gridWidth + c;
+                        if (shadowGrid[idx] === 0) { 
+                            let px = minX + c * res;
+                            let pz = minZ + r * res;
+                            if (distToSegmentSquared(px, pz, b.start.x, b.start.z, b.end.x, b.end.z) <= r2) {
+                                shadowGrid[idx] = 1;
+                                hitCount++;
+                            }
+                        }
+                    }
+                }
+            });
+
+            const actualProjectedArea = hitCount * (res * res);
+            let maxTheoreticalArea = 0;
+            branchesData.forEach(b => { maxTheoreticalArea += b.length * (b.radius * 2) + Math.PI * b.radius * b.radius; });
+            
+            let lNorm = Math.min(1.0, actualProjectedArea / (maxTheoreticalArea || 1));
+
+            // --- Update UI ---
+            const lPercent = (lNorm * 100).toFixed(1);
+            const rPercent = (rNorm * 100).toFixed(1);
+            const mPercent = (mNorm * 100).toFixed(1);
+
+            document.getElementById('score-light').innerText = lPercent; document.getElementById('bar-light').style.width = lPercent + '%';
+            document.getElementById('score-repro').innerText = rPercent; document.getElementById('bar-repro').style.width = rPercent + '%';
+            document.getElementById('score-mech').innerText = mPercent; document.getElementById('bar-mech').style.width = mPercent + '%';
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
